@@ -1,0 +1,24 @@
+name: Deploy function
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  to_gcp:
+    name: Push function to GCP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - id: deploy
+        uses: google-github-actions/deploy-cloud-functions@main
+        with:
+          credentials: ${{ secrets.GCP_SA_KEY }}
+          name: telegram
+          runtime: go113
+          project_id: dolista-safado
+          entry_point: HandleMessage
+          env_vars: APP_CONFIG=${{ secrets.APP_CONFIG }}
+      - id: bind
+        run: curl --data "url=${{ steps.deploy.outputs.url }}" https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/SetWebhook
