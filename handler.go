@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -117,6 +118,12 @@ func HandleMessage(w http.ResponseWriter, r *http.Request) {
 		handleResumo(ctx, reqBody.Message.Chat.Id, config.TelegramToken, client)
 		return
 	}
+
+	// Make sure `/r` is checked after `/resumo` or the logic will break.
+	if strings.HasPrefix(reqBody.Message.Text, "/r") {
+		handleAddResumo(ctx, reqBody.Message.Chat.Id, strings.TrimPrefix(reqBody.Message.Text, "/r"), config.TelegramToken, client)
+		return
+	}
 }
 
 func handleHello(chatID int, message, token string) {
@@ -151,6 +158,18 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 	}
 
 	sendMessage(chatID, b.String(), token)
+}
+
+func handleAddResumo(ctx context.Context, chatID int, newEntry, token string, client *firestore.Client) {
+	_, _, err := client.Collection("summary").Add(ctx, SummaryItem{Message: newEntry})
+	if err != nil {
+		log.Printf("Falied to add message: %v\n", err)
+		sendMessage(chatID, "Ops! O código do Caio não funcionou :)", token)
+		return
+	}
+
+	successMsg := fmt.Sprintf("Adicionado ao resumo: %v", newEntry)
+	sendMessage(chatID, successMsg, token)
 }
 
 func sendMessage(chatID int, message, token string) {
