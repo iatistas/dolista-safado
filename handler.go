@@ -137,7 +137,6 @@ func handleSafada(chatID int, message, token string) {
 func handleResumo(ctx context.Context, chatID int, token string, client *firestore.Client) {
 	iter := client.Collection("summary").Documents(ctx)
 	var msgs []string
-	// var b strings.Builder
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -156,10 +155,8 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 		}
 
 		timeAgo := doc.ReadTime.Sub(doc.CreateTime)
-		msgs = append(msgs, fmt.Sprintf("[%v atrás] %v", timeAgo.String(), item.Message))
-
-		// b.Grow(len(item.Message))
-		// b.WriteString("- " + item.Message + "\n")
+		formattedTimeAgo := fmt.Sprintf("%.0fh, %.0fmin", timeAgo.Hours(), timeAgo.Minutes())
+		msgs = append(msgs, fmt.Sprintf("[%v atrás] %v", formattedTimeAgo, item.Message))
 	}
 
 	resumo := strings.Join(msgs, "\n")
