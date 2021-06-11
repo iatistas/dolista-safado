@@ -136,7 +136,8 @@ func handleSafada(chatID int, message, token string) {
 
 func handleResumo(ctx context.Context, chatID int, token string, client *firestore.Client) {
 	iter := client.Collection("summary").Documents(ctx)
-	var b strings.Builder
+	var msgs []string
+	// var b strings.Builder
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -146,6 +147,7 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 			log.Printf("failed to iterate: %v\n", err)
 			return
 		}
+
 		var item SummaryItem
 		err = doc.DataTo(&item)
 		if err != nil {
@@ -153,15 +155,24 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 			return
 		}
 
-		b.Grow(len(item.Message))
-		b.WriteString("- " + item.Message + "\n")
+		timeAgo := doc.ReadTime.Sub(doc.CreateTime)
+		msgs = append(msgs, fmt.Sprintf("[%v atrás] %v", timeAgo.String(), item.Message))
+
+		// b.Grow(len(item.Message))
+		// b.WriteString("- " + item.Message + "\n")
 	}
 
-	sendMessage(chatID, b.String(), token)
+	resumo := strings.Join(msgs, "\n")
+	sendMessage(chatID, fmt.Sprintf("Resumo: \n\n%v", resumo), token)
 }
 
 func handleAddResumo(ctx context.Context, chatID int, message, token string, client *firestore.Client) {
 	split := strings.Split(message, " ")
+	if len(split) == 1 {
+		sendMessage(chatID, "Safado! Cadê a mensagem pra adicionar no resumo?", token)
+		return
+	}
+
 	newEntry := strings.Join(split[1:], " ")
 	_, _, err := client.Collection("summary").Add(ctx, SummaryItem{Message: newEntry})
 	if err != nil {
