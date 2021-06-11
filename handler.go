@@ -121,7 +121,7 @@ func HandleMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Make sure `/r` is checked after `/resumo` or the logic will break.
 	if strings.HasPrefix(reqBody.Message.Text, "/r") {
-		handleAddResumo(ctx, reqBody.Message.Chat.Id, strings.TrimPrefix(reqBody.Message.Text, "/r"), config.TelegramToken, client)
+		handleAddResumo(ctx, reqBody.Message.Chat.Id, reqBody.Message.Text, config.TelegramToken, client)
 		return
 	}
 }
@@ -160,7 +160,9 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 	sendMessage(chatID, b.String(), token)
 }
 
-func handleAddResumo(ctx context.Context, chatID int, newEntry, token string, client *firestore.Client) {
+func handleAddResumo(ctx context.Context, chatID int, message, token string, client *firestore.Client) {
+	split := strings.Split(message, " ")
+	newEntry := strings.Join(split[1:], " ")
 	_, _, err := client.Collection("summary").Add(ctx, SummaryItem{Message: newEntry})
 	if err != nil {
 		log.Printf("Falied to add message: %v\n", err)
