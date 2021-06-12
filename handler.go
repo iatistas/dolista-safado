@@ -156,7 +156,7 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 		}
 
 		// Deletes entries 24h or older without adding them to the final string
-		if doc.CreateTime.Sub(doc.CreateTime).Hours() >= 24 {
+		if doc.ReadTime.Sub(doc.CreateTime).Hours() >= 24 {
 			doc.Ref.Delete(ctx)
 			continue
 		}
