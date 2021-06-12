@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go/v4"
@@ -39,6 +42,12 @@ type Chat struct {
 type SummaryItem struct {
 	Message string `json:"message"`
 }
+
+type ByCreatedDate []*firestore.DocumentSnapshot
+
+func (d ByCreatedDate) Len() int           { return len(d) }
+func (d ByCreatedDate) Less(i, j int) bool { return d[i].CreateTime.Before(d[j].CreateTime) }
+func (d ByCreatedDate) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 
 // Config represents the application config params
 type Config struct {
@@ -136,7 +145,7 @@ func handleSafada(chatID int, message, token string) {
 
 func handleResumo(ctx context.Context, chatID int, token string, client *firestore.Client) {
 	iter := client.Collection("summary").Documents(ctx)
-	var msgs []string
+	var docs []*firestore.DocumentSnapshot
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -147,16 +156,21 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 			return
 		}
 
+		docs = append(docs, doc)
+	}
+
+	sort.Sort(ByCreatedDate(docs))
+	var msgs []string
+	for i := 0; i < len(docs); i++ {
+		doc := docs[i]
 		var item SummaryItem
-		err = doc.DataTo(&item)
+		err := doc.DataTo(&item)
 		if err != nil {
 			log.Printf("failed parse item: %v\n", err)
 			return
 		}
-
 		timeAgo := doc.ReadTime.Sub(doc.CreateTime)
-		formattedTimeAgo := fmt.Sprintf("%.0fh, %.0fmin", timeAgo.Hours(), timeAgo.Minutes())
-		msgs = append(msgs, fmt.Sprintf("[%v atrás] %v", formattedTimeAgo, item.Message))
+		msgs = append(msgs, fmt.Sprintf("[%v atrás] %v", makeTimeAgoString(timeAgo), item.Message))
 	}
 
 	resumo := strings.Join(msgs, "\n")
@@ -180,6 +194,14 @@ func handleAddResumo(ctx context.Context, chatID int, message, token string, cli
 
 	successMsg := fmt.Sprintf("Adicionado ao resumo: %v", newEntry)
 	sendMessage(chatID, successMsg, token)
+}
+
+func makeTimeAgoString(timeAgo time.Duration) string {
+	hoursAgo, minutesAgo := timeAgo.Hours(), math.Mod(timeAgo.Minutes(), 60)
+	if hoursAgo == 0 {
+		return fmt.Sprintf("%.0fmin", minutesAgo)
+	}
+	return fmt.Sprintf("%.0fh, %.0fmin", hoursAgo, minutesAgo)
 }
 
 func sendMessage(chatID int, message, token string) {
