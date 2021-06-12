@@ -170,7 +170,7 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 			return
 		}
 		timeAgo := doc.ReadTime.Sub(doc.CreateTime)
-		msgs = append(msgs, fmt.Sprintf("[%v atrás] %v", makeTimeAgoString(timeAgo), item.Message))
+		msgs = append(msgs, fmt.Sprintf("há %v: %v", makeTimeAgoString(timeAgo), item.Message))
 	}
 
 	resumo := strings.Join(msgs, "\n")
@@ -197,11 +197,11 @@ func handleAddResumo(ctx context.Context, chatID int, message, token string, cli
 }
 
 func makeTimeAgoString(timeAgo time.Duration) string {
-	hoursAgo, minutesAgo := timeAgo.Hours(), math.Mod(timeAgo.Minutes(), 60)
+	hoursAgo, minutesAgo := math.Floor(timeAgo.Hours()), math.Floor(math.Mod(timeAgo.Minutes(), 60))
 	if hoursAgo == 0 {
 		return fmt.Sprintf("%.0fmin", minutesAgo)
 	}
-	return fmt.Sprintf("%.0fh, %.0fmin", hoursAgo, minutesAgo)
+	return fmt.Sprintf("%.0fh%.0fmin", hoursAgo, minutesAgo)
 }
 
 func sendMessage(chatID int, message, token string) {
