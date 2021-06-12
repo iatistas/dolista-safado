@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -144,8 +143,8 @@ func handleSafada(chatID int, message, token string) {
 }
 
 func handleResumo(ctx context.Context, chatID int, token string, client *firestore.Client) {
-	iter := client.Collection("summary").Documents(ctx)
-	var docs []*firestore.DocumentSnapshot
+	iter := client.Collection("summary").OrderBy("CreateTime", firestore.Asc).Documents(ctx)
+	var b strings.Builder
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -156,25 +155,26 @@ func handleResumo(ctx context.Context, chatID int, token string, client *firesto
 			return
 		}
 
-		docs = append(docs, doc)
-	}
+		// Deletes entries 24h or older without adding them to the final string
+		if doc.CreateTime.Sub(doc.CreateTime).Hours() >= 24 {
+			doc.Ref.Delete(ctx)
+			continue
+		}
 
-	sort.Sort(ByCreatedDate(docs))
-	var msgs []string
-	for i := 0; i < len(docs); i++ {
-		doc := docs[i]
 		var item SummaryItem
-		err := doc.DataTo(&item)
+		err = doc.DataTo(&item)
 		if err != nil {
 			log.Printf("failed parse item: %v\n", err)
 			return
 		}
+
 		timeAgo := doc.ReadTime.Sub(doc.CreateTime)
-		msgs = append(msgs, fmt.Sprintf("há %v: %v", makeTimeAgoString(timeAgo), item.Message))
+
+		b.Grow(len(item.Message))
+		b.WriteString("[Há " + makeTimeAgoString(timeAgo) + "]" + item.Message + "\n")
 	}
 
-	resumo := strings.Join(msgs, "\n")
-	sendMessage(chatID, fmt.Sprintf("Resumo: \n\n%v", resumo), token)
+	sendMessage(chatID, b.String(), token)
 }
 
 func handleAddResumo(ctx context.Context, chatID int, message, token string, client *firestore.Client) {
