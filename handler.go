@@ -40,6 +40,7 @@ type Chat struct {
 
 // SummaryItem represents one of the items that can be held by a summary
 type SummaryItem struct {
+	ChatID  int    `json:"chat_id"`
 	Message string `json:"message"`
 }
 
@@ -144,7 +145,7 @@ func handleSafada(chatID int, message, token string) {
 }
 
 func handleResumo(ctx context.Context, chatID int, token string, client *firestore.Client) {
-	iter := client.Collection("summary").Documents(ctx)
+	iter := client.Collection("summary").Where("chat_id", "==", chatID).Documents(ctx)
 	var docs []*firestore.DocumentSnapshot
 	for {
 		doc, err := iter.Next()
@@ -191,7 +192,7 @@ func handleAddResumo(ctx context.Context, chatID int, message, token string, cli
 	}
 
 	newEntry := strings.Join(split[1:], " ")
-	_, _, err := client.Collection("summary").Add(ctx, SummaryItem{Message: newEntry})
+	_, _, err := client.Collection("summary").Add(ctx, SummaryItem{ChatID: chatID, Message: newEntry})
 	if err != nil {
 		log.Printf("Falied to add message: %v\n", err)
 		sendMessage(chatID, "Ops! O código do Caio não funcionou :)", token)
