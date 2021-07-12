@@ -145,7 +145,7 @@ func handleSafada(chatID int, message, token string) {
 }
 
 func handleResumo(ctx context.Context, chatID int, token string, client *firestore.Client) {
-	iter := client.Collection("summary").Where("chat_id", "==", chatID).Documents(ctx)
+	iter := client.Collection("summary").Where("ChatID", "==", chatID).Documents(ctx)
 	var docs []*firestore.DocumentSnapshot
 	for {
 		doc, err := iter.Next()
