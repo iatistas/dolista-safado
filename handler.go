@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -36,6 +37,15 @@ type Message struct {
 // A Telegram Chat indicates the conversation to which the message belongs.
 type Chat struct {
 	Id int `json:"id"`
+}
+
+type Cambio struct {
+	Currency string `json:currency`
+	Rates map[string]string `json:rates`
+}
+
+type CambioData struct {
+	Data Cambio `json:data`
 }
 
 // SummaryItem represents one of the items that can be held by a summary
@@ -134,6 +144,11 @@ func HandleMessage(w http.ResponseWriter, r *http.Request) {
 		handleAddResumo(ctx, reqBody.Message.Chat.Id, reqBody.Message.Text, config.TelegramToken, client)
 		return
 	}
+
+	if strings.HasPrefix(reqBody.Message.Text, "/cambio") {
+		handleCambio(reqBody.Message.Chat.Id, reqBody.Message.Text, config.TelegramToken)
+		return
+	}
 }
 
 func handleHello(chatID int, message, token string) {
@@ -203,6 +218,80 @@ func handleAddResumo(ctx context.Context, chatID int, message, token string, cli
 	sendMessage(chatID, successMsg, token)
 }
 
+
+
+func handleCambio(chatID int, message, token string) {
+	split := strings.Split(message, " ")
+	var currency string
+
+	if len(split) == 1 {
+		currency = "BRL"
+	} else {
+		currency = split[1]
+	}
+
+
+	resp, err := http.Get(fmt.Sprintf("https://api.coinbase.com/v2/exchange-rates?currency=%s",currency))
+	if err != nil {
+		log.Printf("Falied to get currency: %v\n", err)
+		sendMessage(chatID, "Ops! Não conseguimos pegar os valores de cambio", token)
+		return
+	}
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Falied to get currency: %v\n", err)
+		sendMessage(chatID, "Ops! Não conseguimos pegar os valores de cambio", token)
+		return
+	}
+
+	var cambioData CambioData
+	err = json.Unmarshal(bodyBytes, &cambioData)
+	if err != nil {
+		log.Printf("Falied to get currency: %v\n", err)
+		sendMessage(chatID, "Ops! Não conseguimos pegar os valores de cambio", token)
+		return
+	}
+
+	var successMsg string
+
+	if len(split) == 1 {
+		dolar, err := strconv.ParseFloat(cambioData.Data.Rates["USD"], 64)
+		if err != nil {
+			log.Printf("Falied to get currency: %v\n", err)
+			sendMessage(chatID, "Ops! Não conseguimos pegar os valores de cambio", token)
+			return
+		}
+
+		dolarAUD, err := strconv.ParseFloat(cambioData.Data.Rates["AUD"], 64)
+		if err != nil {
+			log.Printf("Falied to get currency: %v\n", err)
+			sendMessage(chatID, "Ops! Não conseguimos pegar os valores de cambio", token)
+			return
+		}
+
+		euro, err := strconv.ParseFloat(cambioData.Data.Rates["EUR"], 64)
+		if err != nil {
+			log.Printf("Falied to get currency: %v\n", err)
+			sendMessage(chatID, "Ops! Não conseguimos pegar os valores de cambio", token)
+			return
+		}
+		successMsg = fmt.Sprintf("Cambio default: \nDolar: %f\nDolar AUS: %f\nEuro: %f", 1/dolar, 1/dolarAUD, 1/euro )
+		sendMessage(chatID, successMsg, token)
+		return
+	}
+
+	cambio, err := strconv.ParseFloat(cambioData.Data.Rates["BRL"], 64)
+	if err != nil {
+		log.Printf("Falied to get currency: %v\n", err)
+		sendMessage(chatID, "Ops! Não conseguimos pegar os valores de cambio", token)
+		return
+	}
+
+	successMsg = fmt.Sprintf("Cambio %s: %f", split[1], cambio)
+	sendMessage(chatID, successMsg, token)
+}
+
 func makeTimeAgoString(timeAgo time.Duration) string {
 	hoursAgo, minutesAgo := math.Floor(timeAgo.Hours()), math.Floor(math.Mod(timeAgo.Minutes(), 60))
 	if hoursAgo == 0 {
@@ -226,3 +315,4 @@ func sendMessage(chatID int, message, token string) {
 
 	defer response.Body.Close()
 }
+
