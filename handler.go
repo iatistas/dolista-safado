@@ -226,9 +226,10 @@ func handleCambio(chatID int, message, token string) {
 
 	if len(split) == 1 {
 		currency = "BRL"
+	} else {
+		currency = split[1]
 	}
 
-	currency = split[1]
 
 	resp, err := http.Get(fmt.Sprintf("https://api.coinbase.com/v2/exchange-rates?currency=%s",currency))
 	if err != nil {
